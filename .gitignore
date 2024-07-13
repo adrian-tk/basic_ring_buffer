@@ -1,0 +1,16 @@
+/env
+/area_for_testing
+/mkdocs/site
+ext_doc/
+__pycache__
+.~lock.*
+*.swp
+
+# ignore compiled files
+*.asm
+*.d
+*.elf
+*.hex
+*.i
+*.map
+*.o
