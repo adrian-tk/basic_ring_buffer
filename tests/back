@@ -1,0 +1,103 @@
+import unittest
+import shutil
+import os
+import subprocess
+import ctypes
+import sys
+import io
+import tempfile
+from contextlib import contextmanager
+from ctypes import CDLL
+
+# file name without .c
+FILE_TO_TEST = "ring_buffer"
+
+libc = ctypes.CDLL(None)
+c_stdout = ctypes.c_void_p.in_dll(libc, 'stdout')
+
+@contextmanager
+def stdout_redirector(stream):
+    # The original fd stdout points to. Usually 1 on POSIX systems.
+    original_stdout_fd = sys.stdout.fileno()
+
+    def _redirect_stdout(to_fd):
+        """Redirect stdout to the given file descriptor."""
+        # Flush the C-level buffer stdout
+        libc.fflush(c_stdout)
+        # Flush and close sys.stdout - also closes the file descriptor (fd)
+        sys.stdout.close()
+        # Make original_stdout_fd point to the same file as to_fd
+        os.dup2(to_fd, original_stdout_fd)
+        # Create a new sys.stdout that points to the redirected fd
+        sys.stdout = io.TextIOWrapper(os.fdopen(original_stdout_fd, 'wb'))
+
+    # Save a copy of the original stdout fd in saved_stdout_fd
+    saved_stdout_fd = os.dup(original_stdout_fd)
+    try:
+        # Create a temporary file and redirect stdout to it
+        tfile = tempfile.TemporaryFile(mode='w+b')
+        _redirect_stdout(tfile.fileno())
+        # Yield to caller, then redirect stdout back to the saved fd
+        yield
+        _redirect_stdout(saved_stdout_fd)
+        # Copy contents of temporary file to the given stream
+        tfile.flush()
+        tfile.seek(0, io.SEEK_SET)
+        stream.write(tfile.read())
+    finally:
+        tfile.close()
+        os.close(saved_stdout_fd)
+
+class TestBuffer(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # copy file to currend directory (don't want to work on oryginal)
+        shutil.copyfile(f"../src/{FILE_TO_TEST}.c", f"{FILE_TO_TEST}.c")
+        print(f"file copied to {FILE_TO_TEST}.c")
+        # compile it as shaded (.so) file
+        subprocess.run(["gcc", "-fPIC", "-shared", "-o",
+                        f"{FILE_TO_TEST}.so", f"{FILE_TO_TEST}.c"])
+        print(f"file compiled as {FILE_TO_TEST}.so")
+        # load shared library
+        cls.lib_rb = CDLL("./ring_buffer.so")
+
+    @classmethod
+    def tearDownClass(cls):
+        # clean everything
+        os.remove(f"{FILE_TO_TEST}.c")
+        print(f"{FILE_TO_TEST}.c removed")
+        os.remove(f"{FILE_TO_TEST}.so")
+        print(f"{FILE_TO_TEST}.so removed")
+    def setUp(self):
+        # set arguments and return types for functions
+        self.lib_rb.buffer_put.argtypes = (ctypes.c_char,)
+        self.lib_rb.buffer_put.restype = None
+        self.lib_rb.buffer_pop.argtypes = None 
+        self.lib_rb.buffer_put.restype = ctypes.c_char
+    def test_hello(self):
+        '''check basic put and pop from buffer
+
+        put Hello to a buffer char by char
+        pop 5 char from buffer
+        check if both string are the same
+        '''
+        hw = "Hello"
+        for char in hw:
+            self.lib_rb.buffer_put(char.encode('UTF-8'))
+        ans = ""
+        for char in hw:
+            ans = ans + chr(self.lib_rb.buffer_pop())
+        self.assertEqual(hw, ans)
+        c_out = io.BytesIO()
+        with stdout_redirector(c_out): 
+            self.lib_rb.dump()
+        c_str = c_out.getvalue().decode('utf-8')
+        print(f"===system stdout: {c_str}")
+
+#for i in range(19):
+#    lib_rb.buffer_put(b'x')
+#print(chr(lib_rb.buffer_pop()))
+#lib_rb.dump()
+
+if __name__ == "__main__":
+    unittest.main(verbosity = 2)
