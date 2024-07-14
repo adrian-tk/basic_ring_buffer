@@ -5,7 +5,7 @@ char buffer[BUFSIZE];
 int put_position = 0;
 int pop_position = 0;
 
-void buffer_put(char c){
+int buffer_put(char c){
 	//check if not full
 	int tmp = put_position + 1;
 	if (tmp > BUFSIZE-1){
@@ -17,9 +17,11 @@ void buffer_put(char c){
 		if (put_position == BUFSIZE){
 			put_position = 0;
 		}
+		return 0;
 	}
 	else{
 		printf("WARNING: buffer is full, reject new data\n\r");
+		return 1;
 	}
 
 }
