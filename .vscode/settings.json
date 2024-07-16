@@ -1,0 +1,9 @@
+{
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "/home/domel/Repo/basic_ring_buffer/bin",
+            "binaryPath": "/home/domel/Repo/basic_ring_buffer/bin/main.elf",
+            "binaryArgs": []
+        }
+    ]
+}
