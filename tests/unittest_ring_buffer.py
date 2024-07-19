@@ -1,6 +1,7 @@
 import unittest
 import ctypes
 import io
+import os
 
 # local for testing c code
 import c_test
@@ -16,6 +17,12 @@ class TestBuffer(unittest.TestCase):
         copy file and compile it
         load shared library
         '''
+
+        # set working directory to script directory
+        # necessery when script is called from other dirs.
+        abspath = os.path.abspath(__file__)
+        dname = os.path.dirname(abspath)
+        os.chdir(dname)
 
         c_test.compile(FILE_TO_TEST)
         # load shared library
