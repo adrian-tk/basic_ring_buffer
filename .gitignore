@@ -14,3 +14,6 @@ __pycache__
 *.i
 *.map
 *.o
+.vscode/launch.json
+.vscode/settings.json
+.vscode/settings.json
